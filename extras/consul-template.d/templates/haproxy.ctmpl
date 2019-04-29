@@ -1,0 +1,31 @@
+global
+  maxconn 100
+
+defaults
+  log global
+  mode tcp
+  retries 2
+  timeout client 30m
+  timeout connect 4s
+  timeout server 30m
+  timeout check 5s
+
+listen stats
+  mode http
+  bind *:7000
+  stats enable
+  stats uri /
+
+listen master
+  bind *:5000
+  option httpchk OPTIONS /master
+  http-check expect status 200
+  default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions{{$leader := key "service/batman/leader"}}{{range ls "service/batman/members"}}{{if eq .Key $leader}}
+  server {{.Key}}{{$data := .Value | parseJSON}} {{index ($data.conn_url | split "/") 2}} maxconn 100 check port {{index ((index ($data.api_url | split "/") 2) | split ":") 1}}{{end}}{{end}}
+
+listen replicas
+  bind *:5001
+  option httpchk OPTIONS /replica
+  http-check expect status 200
+  default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions {{$leader := key "service/batman/leader"}}{{range ls "service/batman/members"}}{{if ne .Key $leader}}
+  server {{.Key}}{{$data := .Value | parseJSON}} {{index ($data.conn_url | split "/") 2}} maxconn 100 check port {{index ((index ($data.api_url | split "/") 2) | split ":") 1}}{{end}}{{end}}

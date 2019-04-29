@@ -1,0 +1,14 @@
+[Unit]
+Description=Consul-Template service for HAProxy configuration
+Requires=network-online.target
+After=network-online.target consul.service
+
+[Service]
+User=haproxy
+Group=haproxy
+Restart=on-failure
+ExecStart=/bin/consul-template -config=/etc/consul-template.d/configs/haproxy.hcl
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target
